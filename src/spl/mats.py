@@ -2,6 +2,7 @@ from IPython.core.debugger import set_trace
 import numpy as np
 from poly_ring import *
 from primitives import *
+import random
 
 # This program mimics the MatSPL representation in Spiral
 # General Design:
@@ -31,6 +32,7 @@ class FullMat(Mat):
             for j in range(self.n):
                 operands.append(Expr("mult",[self.el(i,j),inputs[j]]))
             outputs[i].definition=Expr("add",operands)
+        return inputs,outputs,localVals
     def el(i,j):
         pass
 
@@ -64,6 +66,7 @@ class DiagMat(Mat):
     def getOutputs(self,inputs,outputs,localVals):
         for i in range(self.n):
             outputs[i].definition=Expr("mult",[self.el(i),inputs[i]])
+        return inputs,outputs,localVals
         
 #used as superclass for all diagonals (as codegen interface)
 class Tw(DiagMat):
@@ -123,14 +126,20 @@ class Tensor(Mat):
             for j in range(self.n):
                 ret[i][j]=m1m[i//m2m.shape[0]][j//m2m.shape[0]]*m2m[i%m2m.shape[0]][j%m2m.shape[0]]%self.p
         return np.array(ret)
-    def getOutputs(self,inputs,outputs,localVals): #to keep from spawing locals, always assume one mat is diagonal (because it will be). Considering full matricies requires n^2 locals
+    def getOutputs(self,inputs,outputs,localVals): 
         if isinstance(self.m1,DiagMat):
             for i in range(self.m1.n):
-                self.m2.getOutputs(inputs[self.m2.n*i:self.m2.n*(i+1)],outputs[self.m2.n*i:self.m2.n*(i+1)],localVals)
+                inputs[self.m2.n*i:self.m2.n*(i+1)],outputs[self.m2.n*i:self.m2.n*(i+1)],localVals = self.m2.getOutputs(inputs[self.m2.n*i:self.m2.n*(i+1)],outputs[self.m2.n*i:self.m2.n*(i+1)],localVals)
                 for j in range(self.m2.n):
-                    outputs[self.m2.n*i+j].definition=Expr("mult",(self.m1.el(i),outputs[self.m2.n*i+j]))
+                    #l = Val("local",definition=outputs[self.m2.n*i+j].definition,local=True)
+                    #localVals.append(l)
+                    outputs[self.m2.n*i+j].definition=Expr("mult",(self.m1.el(i),outputs[self.m2.n*i+j].definition))
+            return inputs,outputs,localVals
         else:
-            print("Tensor does not match (D x A)")            
+            if not isinstance(self.m2,DiagMat):
+                print("Error: One operand of tensor must be diagonal!")
+            reverse = MM(MM(LPerm(self.n,self.p,self.m1.n),Tensor(self.m2,self.m1)),LPerm(self.n,self.p,self.m2.n))
+            return reverse.getOutputs(inputs,outputs,localVals)
 
 class MM(Mat):
     def __init__(self,m1,m2):
@@ -141,7 +150,18 @@ class MM(Mat):
     def getMat(self):
         ret = self.m1.getMat()@self.m2.getMat()
         return np.array([[ret[j][i]%self.p for i in range(self.n)] for j in range(self.n)])
-    
+    def getOutputs(self,inputs,outputs,localVals):
+        if isinstance(self.m2,PermMat):
+            inputs = [inputs[self.m2.perm(i)] for i in range(len(inputs))] 
+            return self.m1.getOutputs(inputs,outputs,localVals)
+        if isinstance(self.m1,PermMat):
+            outputs = [outputs[self.m1.iperm(i)] for i in range(len(outputs))]
+            return self.m2.getOutputs(inputs,outputs,localVals)
+        inputs,outputs,localVals = self.m2.getOutputs(inputs,outputs,localVals)
+        interVals=[Val("local",o.definition,local=True) for o in outputs]
+        localVals+=interVals
+        return self.m1.getOutputs(interVals,outputs,localVals)
+
 class Ident(DiagMat):
     def __init__(self,n,p):
         DiagMat.__init__(self,n,p)
@@ -156,6 +176,7 @@ class PermMat(Mat):
     def getOutputs(self,inputs,outputs,localVals):
         for i in range(self.n):
             outputs[i].definition=inputs[self.perm(i)]
+        return inputs,outputs,localVals
 
 class LPerm(PermMat):
     def __init__(self,n,p,stride):
@@ -164,6 +185,8 @@ class LPerm(PermMat):
         self.m=n//stride
     def perm(self,i):
         return i//self.m+self.str*(i%self.m)
+    def iperm(self,i):
+        return i//self.str+self.m*(i%self.str)
     def getMat(self):
         return np.array([[1 if self.perm(j)==i else 0 for i in range(self.n)] for j in range(self.n)])
  
@@ -175,7 +198,6 @@ class Reduction(Mat):
         self.par=par
     def multiply(self,x):
         for i in range(len(self.mats)-1,-1,-1):
-            print(x)
             x=self.mats[i].getMat()@x
             for j in range(len(x)):
                 x[j]%=self.p
@@ -185,7 +207,7 @@ class Reduction(Mat):
             return "no mats"
         ret=self.mats[0]
         for i in range(1,len(self.mats)):
-            ret=MM(ret.copy(),self.mats[i])
+            ret=MM(ret,self.mats[i]) #removed ret".copy()"
         return ret
     def __str__(self):
         ret=""
@@ -208,10 +230,14 @@ class Reduction(Mat):
         ret += "\n"+self.c1.symbolic(off+1)
         ret += "\n"+self.c2.symbolic(off+1)
         return ret
+    def getOutputs(self,inputs,outputs,localVals):
+        return self.result().getOutputs(inputs,outputs,localVals)
+
+
 class CT(Reduction):
     def __init__(self,ntt,radix,omit_perm=False):
         Reduction.__init__(self,[],ntt)
-        assert ntt.Tr==False
+        #assert ntt.Tr==False
         m=ntt.n//radix
         self.radix=radix
         self.c1 = NTT(ntt.pr.toNeg().reduce(m),Inv=ntt.Inv)
@@ -227,7 +253,7 @@ class CT(Reduction):
 class GS(Reduction):
     def __init__(self,ntt,radix,omit_perm=False):
         Reduction.__init__(self,[],ntt)
-        assert ntt.Tr==True
+        #assert ntt.Tr==True
         m=ntt.n//radix
         self.radix=radix
         self.c1 = NTT(ntt.pr.reduce(m),Inv=ntt.Inv,Tr=True)
@@ -243,7 +269,7 @@ class GS(Reduction):
 class Spiral_DIF(Reduction):
     def __init__(self,ntt,radix,omit_perm=False):
         Reduction.__init__(self,[],ntt)
-        assert ntt.Tr==True
+        #assert ntt.Tr==True
         m=ntt.n/radix
         self.c1 = NTT(ntt.pr.toNeg().reduce(m),Inv=ntt.Inv)
         self.c2 = NTT(ntt.pr.reduce(radix),Inv=ntt.Inv)
@@ -287,7 +313,6 @@ def build_reduction_tt(cur,red,radices,omit_perm=False):
     rradices = radices[1][1]
     assert cur.n>2, f"Applying reduction to NTT_{cur.n}<=2 not allowed"
     reduced = red(cur,radix,omit_perm=omit_perm)
-    #the children are reversed between CT vs GS, but this is not represented here...
     reduced.c1 = build_reduction_tt(reduced.c1,red,lradices,omit_perm=omit_perm)
     reduced.c2 = build_reduction_tt(reduced.c2,red,rradices,omit_perm=omit_perm)
     return reduced

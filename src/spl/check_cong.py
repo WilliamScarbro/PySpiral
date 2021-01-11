@@ -54,4 +54,13 @@ def ntt1(S,m):
    # dit = MM(MM(Tensor(NTTm,Ident(
 #transform(6,3)
 #reverse(6,3)
-twiddle(8,4)
+#twiddle(8,4)
+
+pr = PolyRing(4,17)
+ntt = NTT(pr)
+print(ntt)
+gs = GS(ntt,2)
+print(gs)
+
+ct = CT(ntt,2)
+print(ct)

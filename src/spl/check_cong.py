@@ -56,11 +56,14 @@ def ntt1(S,m):
 #reverse(6,3)
 #twiddle(8,4)
 
-pr = PolyRing(4,17)
+pr = PolyRing(8,17)
 ntt = NTT(pr)
 print(ntt)
-gs = GS(ntt,2)
-print(gs)
 
-ct = CT(ntt,2)
-print(ct)
+tt=(4,(2,2))
+reduction = build_reduction_tt(ntt,CT,tt)
+print(reduction.c1)
+print(reduction.c2)
+
+from codegen import *
+codeWrite(ntt,"ntt_8","ntt_test.c")

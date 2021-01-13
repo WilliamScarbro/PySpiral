@@ -28,6 +28,7 @@ class Val(Expr):
         else:
             self.label=label
         self.definition=definition
+        self.local=local
     def __str__(self):
         return str(self.label)
     def toSymbolic(self,interVals):

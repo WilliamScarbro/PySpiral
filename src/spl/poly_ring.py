@@ -3,19 +3,19 @@
 #Contains PolyRing and other ff related functions
 
 class PolyRing:
-    def __init__(self,n,p,Pos=False):
+    def __init__(self,n,p=None,Pos=False):
         self.n=n
-        self.p=p
+        self.p=p if p!=None else getMod(self.n,NW=not Pos)
         self.Pos=Pos
-        assert (p-1)%n==0
-        k=(p-1)//n
-        r=primitive_root(p)
-        self.psi=pow(r,k//2,p)
-        self.w=pow(r,k,p)
-        self.psi_i = pow(self.psi,2*n-1,p)
-        self.w_i = pow(self.w,n-1,p)
-        assert self.psi*self.psi_i % p == 1
-        assert self.w*self.w_i % p == 1
+        assert (self.p-1)%n==0
+        k=(self.p-1)//n
+        r=primitive_root(self.p)
+        self.psi=pow(r,k//2,self.p)
+        self.w=pow(r,k,self.p)
+        self.psi_i = pow(self.psi,2*n-1,self.p)
+        self.w_i = pow(self.w,n-1,self.p)
+        assert (self.psi*self.psi_i) % self.p == 1
+        assert (self.w*self.w_i) % self.p == 1
     def __str__(self):
         return f"PolyRing Z/{self.p}[X]/(X^{self.n} {'+' if self.Pos else '-'} 1)\n "
     def getRoots(self,Inv):

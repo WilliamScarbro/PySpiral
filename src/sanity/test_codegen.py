@@ -1,15 +1,15 @@
 import sys
 sys.path.insert(1,"../spl")
 import codegen
-import mats
-import poly_ring
+from mats import *
+from poly_ring import *
 import numpy
 import subprocess
 import os
 
 
 # This suite tests generated c code against the transforms from mats
-# This assumes that all of the transforms from mats are correct
+# This assumes that all of the transforms from are correct
 
 def main_for_test(test_location,test_name, inputs, dtype):
     length = len(inputs)
@@ -37,27 +37,42 @@ def test_transform(mat,name,inputs=None):
     out = [int(d) for d in decoded[1:-1].split(",")]
     print(out)
     print(correct_out.reshape(1,-1))
-    print(numpy.array(out).reshape(-1,1)==correct_out) 
+    for i,j in zip(correct_out,out):
+        print(i%mat.p==j%mat.p)
 
 def test_ntt():
-    pr = poly_ring.PolyRing(8)
-    ntt = mats.NTT(pr)
+    pr = PolyRing(8)
+    ntt = NTT(pr)
     test_transform(ntt,"ntt_8")
 
 def test_tensor():
-    pr=poly_ring.PolyRing(4)
-    ntt4 = mats.NTT(pr)
-    t = mats.Tensor(mats.Ident(2,17),ntt4)
+    pr=PolyRing(4)
+    ntt4 = NTT(pr)
+    t = Tensor(Ident(2,17),ntt4)
     test_transform(t,"tensor_8")
 
 def test_gs():
-    pr=poly_ring.PolyRing(4)
-    ntt4 = mats.NTT(pr)
-    gs=mats.GS(ntt4,2)
-    print(gs)
+    pr4=PolyRing(4)
+    pr2=PolyRing(2,17)
+    ntt4 = NTT(pr4)
+    ntt2 = NTT(pr2)
+    gs=GS(ntt4,2)
+    t=Tensor(Ident(2,17),ntt2)
+    gs_1  =MM(LPerm(4,17,2),t)
+    t2 = Tensor(ntt2,Ident(2,17))
+    gs_2 = MM(Tw_CT(pr4,2),t2)
+    #print(gs)
     test_transform(gs,"GS_4")
 
+def test_ct():
+    pr4=PolyRing(4)
+    ntt4 = NTT(pr4)
+    ct = CT(ntt4,2)
+    test_transform(ct,"CT_4")
+
+
+test_ct()
 test_gs()
-#test_tensor()
-#test_ntt()    
+test_tensor()
+test_ntt()    
 #main_for_test("file_name","test_name",[0,1,2,3,4,5,6,7],"long")

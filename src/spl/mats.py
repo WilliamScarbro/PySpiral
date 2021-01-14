@@ -155,13 +155,11 @@ class MM(Mat):
             inputs = [inputs[self.m2.perm(i)] for i in range(len(inputs))] 
             return self.m1.getOutputs(inputs,outputs,localVals)
         if isinstance(self.m1,PermMat):
-            #outputs = [outputs[self.m1.iperm(i)] for i in range(len(outputs))]
             inputs,outputs,localVals = self.m2.getOutputs(inputs,outputs,localVals)
             newDefs = [outputs[self.m1.perm(i)].definition for i in range(len(outputs))]
             for i in range(len(outputs)):
                 outputs[i].definition=newDefs[i]
             return inputs,outputs,localVals
-            #return self.m2.getOutputs(inputs,outputs,localVals)
         inputs,outputs,localVals = self.m2.getOutputs(inputs,outputs,localVals)
         interVals=[Val("local",o.definition,local=True) for o in outputs]
         localVals+=interVals
@@ -212,7 +210,7 @@ class Reduction(Mat):
             return "no mats"
         ret=self.mats[0]
         for i in range(1,len(self.mats)):
-            ret=MM(self.mats[i],ret) #removed ret".copy()"
+            ret=MM(ret,self.mats[i]) #removed ret".copy()"
         return ret
     def __str__(self):
         ret=""

@@ -80,12 +80,9 @@ def expr2C(expr):
         return str(expr)
     if expr.operation=="assign":
         assert isinstance(expr.operands[0],Val)
-        #if isinstance(expr.operands[1],Val) and expr.operands[0].local:
-            #print(f"found equiv {expr.operands[0]}={expr.operands[1]}")
-            #equivMap[expr.operands[0].label]=expr.operands[1].label
-        #    expr.operands[0].setEqual(expr.operands[1])
-        #    return ""
-        #print(f"assignment: {expr.operands[1]}")
+        if isinstance(expr.operands[1],Val) and expr.operands[0].local:
+            expr.operands[0].setEqual(expr.operands[1])
+            return ""
         return expr.operands[0].label+"="+expr2C(expr.operands[1])
     if expr.operation=="add":
         addition = expr2C(expr.operands[0])
@@ -139,7 +136,7 @@ if __name__=="__main__":
 
     m2 = MM(ntt4,l)
     print(codeGen(m2,"MM_4_rev"))
-    '''
+    
     gs = GS(ntt4,2)
     print(codeGen(gs,"GS_NTT8_2"))
 
@@ -153,25 +150,29 @@ if __name__=="__main__":
 
     gs_whole = MM(gs_2,gs_1)
     print(codeGen(gs_whole,"GS_WHOLE"))
+    '''
 
 
-
-    ct = CT(ntt4,2)
+    ct = CT(ntt8,2)
     print(codeGen(ct,"CT_NTT8_2"))
 
-    ct_1 = MM(Tw_CT(pr4,2),Tensor(ntt2,Ident(2,17)))
-    print(codeGen(ct_1,"CT_1"))
+    ct_1 = MM(Tw_CT(pr8,4),Tensor(ntt2,Ident(4,17)))
+    #print(ct_1)
+    #print(codeGen(ct_1,"CT_1"))
 
-    ct_2 = MM(LPerm(4,17,2),Tensor(Ident(2,17),ntt2))
-    print(codeGen(ct_2,"CT_2"))
+    ct_2 = MM(LPerm(8,17,2),Tensor(Ident(2,17),ntt4))
+    #print(ct_2)
+    #print(codeGen(ct_2,"CT_2"))
 
     ct_whole = MM(ct_2,ct_1)
     print(codeGen(ct_whole,"CT_Whole"))
-'''
-
-    ntt32 = NTT(PolyRing(8))
+    '''  
+    ct2_1 = Tensor(Ident(2,17),ct)
+    print(codeGen(ct2_1,"CT2_1"))
+    '''
+    ntt32 = NTT(PolyRing(16))
     red_ntt32 = random_reduction(ntt32,CT)
-    print(red_ntt32)
+    #print(red_ntt32.getMat()==ntt32.getMat())
     print(codeGen(red_ntt32,"Red_NTT32"))
 
-    '''
+    

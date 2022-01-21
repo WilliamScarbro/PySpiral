@@ -3,6 +3,10 @@ from poly_ring import *
 from primitives import *
 import sys
 
+global mul_count
+global add_count
+global mod_count
+
 def random_reduction(transform, breakdown=CT):
     tt=random_tt(transform.n)
     print("tuple tree:",tt)
@@ -59,12 +63,30 @@ def cGen(fName,inputs,outputs,localVals,symbolLines):
     else:
         init_locals="  /*no locals */ \n"
     computation=""
-    equivMap={}
+    ops = np.array([0,0,0])
     for sl in symbolLines:
+        cur_ops=opp_counter(sl)
+        ops+=cur_ops
         code = expr2C(sl)
         if code !="":
-            computation+="  "+code+";\n"
-    return start_template+function_wrapper+init_locals+computation+"}\n"
+            computation+="  "+code+f";\n"# //add:{cur_ops[0]} mul:{cur_ops[1]} mod:{cur_ops[2]} \n"
+    return start_template+function_wrapper+init_locals+computation+f"\n  //add:{ops[0]} mul:{ops[1]} mod:{ops[2]}\n"+"}\n"
+
+def opp_counter(expr):
+    ret=np.array([0,0,0])
+    if not isinstance(expr,Expr) or isinstance(expr,Val):
+        return ret
+    if expr.operation=="add":
+        ret[0]+=len(expr.operands)-1
+    if expr.operation=="mult":
+        ret[1]+=len(expr.operands)-1
+    if expr.operation=="mod":
+        ret[2]+=1
+    for op in expr.operands:
+        ret+=opp_counter(op)
+    #print(expr)
+    #print(ret)
+    return ret 
 
 #expr can be Expr or int
 #all Vals should have been replaced by assign(label,definition)
